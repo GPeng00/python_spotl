@@ -1,0 +1,111 @@
+function greens_func(dep,lame)
+!\rm green.bou.*
+% DISTS 
+ds=vertcat((.025:.01:.995)', (1.05:.1:9.95)', (10.25:.5:89.75)', (90.5:1:179.5)');
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%% SOLUTIONS FROM MALVERN 1969 %%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+% everything in r, theta and d
+a=6371000; %earth radius
+g=9.81;
+nu=lame.nu; %.2461;
+G= lame.G; % 3.3*10^10 I have to make this artificially high to match the integrated solution with one layer
+P=1*g; % load in Newtons
+E=lame.E;
+depth=dep*1000;
+for z=depth % in meters
+x=ds(:,1) %fars(:,1)
+for j=1:length(x)
+    delta=x(j)*pi/180
+    r=a*abs(x(j))*pi/180 % a*delta in radians
+    R=sqrt(r^2+z^2);
+    %%%%%%%%%% 
+    % STRESS TENSOR
+    T(1,1)= P/(2*pi)*((1-2*nu)*(1/r^2-z/(R*r^2))-3*z*r^2/(R^5)) % Trr
+    T(2,2)= -P/(2*pi)*(1-2*nu)*(1/r^2-z/(R*r^2)-z/R^3) % Ttt
+    T(3,3)= -3*P*z^3/(2*pi*R^5) % Tzz
+    T(1,3)= -3*P*r*z^2/(2*pi*R^5) % Trz
+    T(1,2)=0; T(2,1)=0; % Trt
+    T(2,3)=0; T(3,2)=0; % Ttz
+    
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%% Stress to Strain - Hooke's Law %%%%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    e(1,1)=1/E*(T(1,1)-nu*(T(2,2)+T(3,3))); % e_rr
+    e(2,2)=1/E*(T(2,2)-nu*(T(1,1)+T(3,3))); % e_tt
+    e(3,3)=1/E*(T(3,3)-nu*(T(1,1)+T(2,2))); % e_zz
+    e(1,3)=T(1,3)/(2*G); % e_rz
+    e(3,1)=T(3,1)/(2*G); % e_zr = 0
+    e(2,3)=T(2,3)/(2*G); % e_tz = 0
+    e(3,2)=T(3,2)/(2*G); % e_zt = 0
+    e(1,2)=T(1,2)/(2*G); % e_rt = 0
+    e(2,1)=T(2,1)/(2*G); % e_tr = 0
+    bous(j,1)=e(1,1)*10^12*(a*delta)^2; % e_rr 
+    bous(j,2)=e(2,2)*10^12*(a*delta)^2; % e_tt 
+    bous(j,3)=e(1,2)*10^12*(a*delta)^2; % e_rt 
+    bous(j,4)=e(1,3)*10^12*(a*delta)^2; % e_rz 
+    bous(j,5)=e(2,3)*10^12*(a*delta)^2; % e_tz 
+    bous(j,6)=e(3,3)*10^12*(a*delta)^2; % e_zz
+end
+bous=horzcat(ds(:,1), bous)
+
+%%%%%%%%%%%%%%% SPOTL Normalization %%%%%%%%%%%%%%%%%%%%%%%%
+
+K=10^12
+for i=1:length(bous)
+    Gtp(i,1)=bous(i,2)/K*((2*sin(bous(i,1)*pi/180*.5))/(bous(i,1)*pi/180))^2; % e_rr --> e_tt
+    Gtp(i,2)=bous(i,3)/K*((2*sin(bous(i,1)*pi/180*.5))/(bous(i,1)*pi/180))^2; % e_tt --> e_ll
+    Gtp(i,3)=bous(i,4)/K*((2*sin(bous(i,1)*pi/180*.5))/(bous(i,1)*pi/180))^2; % e_rt --> 0
+    Gtp(i,4)=bous(i,5)/K*((2*sin(bous(i,1)*pi/180*.5))/(bous(i,1)*pi/180))^2; % e_rz
+    Gtp(i,5)=bous(i,6)/K*((2*sin(bous(i,1)*pi/180*.5))/(bous(i,1)*pi/180))^2; % e_tz --> 0
+    Gtp(i,6)=bous(i,7)/K*((2*sin(bous(i,1)*pi/180*.5))/(bous(i,1)*pi/180))^2; % e_zz
+end
+
+all=horzcat(ds, Gtp(:,1:3), vertcat(.01*ones(98,1),.1*ones(90,1),.5*ones(160,1), 1*ones(90,1)), Gtp(:,4:6));
+
+bGF=[];
+for i = 1:length(all)
+    bGF(i,1)=all(i,2)*log((sin(all(i,1)*pi/180/2)*cos(all(i,5)*pi/180/4)+cos(all(i,1)*pi/180/2)*sin(all(i,5)*pi/180/4))/(sin(all(i,1)*pi/180/2)*cos(all(i,5)*pi/180/4)-cos(all(i,1)*pi/180/2)*sin(all(i,5)*pi/180/4))); % e_rr --> e_tt
+    bGF(i,2)=all(i,3)*log((sin(all(i,1)*pi/180/2)*cos(all(i,5)*pi/180/4)+cos(all(i,1)*pi/180/2)*sin(all(i,5)*pi/180/4))/(sin(all(i,1)*pi/180/2)*cos(all(i,5)*pi/180/4)-cos(all(i,1)*pi/180/2)*sin(all(i,5)*pi/180/4))); % e_tt --> e_ll
+    bGF(i,3)=all(i,4)*log((sin(all(i,1)*pi/180/2)*cos(all(i,5)*pi/180/4)+cos(all(i,1)*pi/180/2)*sin(all(i,5)*pi/180/4))/(sin(all(i,1)*pi/180/2)*cos(all(i,5)*pi/180/4)-cos(all(i,1)*pi/180/2)*sin(all(i,5)*pi/180/4))); % e_rt --> 0
+    bGF(i,4)=all(i,6)*log((sin(all(i,1)*pi/180/2)*cos(all(i,5)*pi/180/4)+cos(all(i,1)*pi/180/2)*sin(all(i,5)*pi/180/4))/(sin(all(i,1)*pi/180/2)*cos(all(i,5)*pi/180/4)-cos(all(i,1)*pi/180/2)*sin(all(i,5)*pi/180/4))); % e_rz --> e_tz
+    bGF(i,5)=all(i,7)*log((sin(all(i,1)*pi/180/2)*cos(all(i,5)*pi/180/4)+cos(all(i,1)*pi/180/2)*sin(all(i,5)*pi/180/4))/(sin(all(i,1)*pi/180/2)*cos(all(i,5)*pi/180/4)-cos(all(i,1)*pi/180/2)*sin(all(i,5)*pi/180/4))); % e_tz --> e_lz=0
+    bGF(i,6)=all(i,8)*log((sin(all(i,1)*pi/180/2)*cos(all(i,5)*pi/180/4)+cos(all(i,1)*pi/180/2)*sin(all(i,5)*pi/180/4))/(sin(all(i,1)*pi/180/2)*cos(all(i,5)*pi/180/4)-cos(all(i,1)*pi/180/2)*sin(all(i,5)*pi/180/4))); % e_zz  
+end
+
+bGF=horzcat(all(:,1), bGF); % (2:e_rr-->e_tt) (3:e_tt-->e_ll) (4:e_rt-->e_tl=0) (5:e_rz-->e_tz) (6:e_tz-->e_lz=0) 7:e_zz 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%% FORMAT OUT %%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+load green % this is the file that you use the potentials, displacements, etc. from
+%new=horzcat(green(:,1:4), vertcat(bGF(1:188,2:3),green(189:length(ds),5:6)) ,bGF(:,5), bGF(:,7), green(:,7));
+new=horzcat(green(:,1:4), vertcat(bGF(1:188,2:3), zeros(length(ds)-188,2)), green(:,7), vertcat(bGF(1:188,4:6), zeros(length(ds)-188,3)));
+
+fid = fopen('in','w');
+for i=1:length(new)
+    for j=1:size(new,2)-1
+        fprintf(fid,' %13.6e',new(i,j));
+    end
+    fprintf(fid,' %13.6e\n',new(i,j+1));
+end
+fclose(fid);
+
+command = sprintf('%s %s %d %d', 'makegreen.scr', 'in', abs(z/1000), size(new,2));
+unix(command)
+
+figure
+subplot(2,1,1)
+plot(ds, green(:,5),'g.')
+hold on
+plot(ds, bGF(:,2),'b.')
+xlim([0 10])
+title('e_r_r')
+subplot(2,1,2)
+plot(ds, green(:,6),'g.')
+hold on
+plot(ds, bGF(:,3),'b.')
+xlim([0 10])
+title('e_t_t')
+end

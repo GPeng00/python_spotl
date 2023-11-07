@@ -1,0 +1,22 @@
+#!/bin/bash
+# input arguments are input file, output file name and number of columns
+out=green.bou.$2
+echo $out
+echo HALF SPACE GREENS FUNCTION $2 KM DEPTH > $out
+l1=`head -2 green.gbcont.wef.p01.cm | tail -1 | sed -e 's/7  /'$3'  /g'`
+l2=`head -101 green.gbcont.wef.p01.cm | tail -1 | sed -e 's/7  /'$3'  /g'`
+l3=`head -192 green.gbcont.wef.p01.cm | tail -1 | sed -e 's/7  /'$3'  /g'` 
+l4=`head -353 green.gbcont.wef.p01.cm | tail -1 | sed -e 's/7  /'$3'  /g'`
+
+echo $l1 >> $out
+head -98 $1 >> $out
+echo $l2 >> $out
+head -188 $1 | tail -90 >> $out
+echo $l3 >> $out
+head -348 $1 | tail -160 >> $out
+echo $l4 >> $out
+tail -90 $1 >> $out
+
+head $out
+
+
