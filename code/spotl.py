@@ -14,7 +14,7 @@ import numpy as np
 import os
 import pickle
 
-def nloadf(station, tideFile, greenFile, modo, *args, **kwargs):
+def nloadf(station, tideFile, greenFile, modo, **kwargs):
     
     """
     Calculate load tides at a specified station using tide and Greens function data.
@@ -142,14 +142,9 @@ def nloadf(station, tideFile, greenFile, modo, *args, **kwargs):
     >>> modo = 'g'
     >>> output = nloadf(station, tideFile, greenFile, modo)
     
-    Note: You need to implement the missing parts of the code and adapt it to your specific use case.
-    
     Written 1/2012 by Charlie Sievers @ UNAVCO.  Modified 11/2023 by Amanda M. Thomas at the University of Oregon.
     """
     
-    if len(args) < 4:
-        raise ValueError(f'Invalid number of inputs: nloadf requires at least 4, {len(args)} given')
-
     # Read tide model and Greens function
     tideModel = read_tide_model_file(tideFile)
     green = read_greens_function_file(greenFile)
@@ -175,72 +170,68 @@ def nloadf(station, tideFile, greenFile, modo, *args, **kwargs):
         'delResolutionFactor': 1,
         'showPlot': 0
     }
+        
+    # I don't think this block is needed since function requires 4 args
+    # if Nargs == 1 and isinstance(args[0], dict):
+    #     # Make sure the structure is of the right type
+    #     fnAS = argStruct.keys()
+    #     fnVA = args[0].keys()
+    #     if len(fnAS) != len(fnVA) or len(fnAS) != sum(key in fnAS for key in fnVA):
+    #         raise ValueError('The attempted override for the argument structure is wrong. The structure is not of the right type.')
     
-    Nargs = len(args)
+    #     argStruct = args[0]
+    #     if len(args) > 1:
+    #         print("Attempts to modify an argument structure with key/value and flags are not allowed. All modifications are ignored.")
+    # else:
+    #     iArg = 0
+    #     while iArg < Nargs:
+    #         if not isinstance(args[iArg], str):
+    #             key = args[iArg]
+    #             raise ValueError(f'Invalid key: {key}. Keys must be strings.')
+          
+    if 'polygon' in kwargs.keys():
+        # If polygon input is string, then read the polygon file
+        if isinstance(kwargs['polygon'], str):
+            argStruct['polygon'] = read_polygon_file(argStruct['polygon'])
+        else:
+            argStruct['polygon'] = kwargs['polygon']
+            
+        '''
+        kwargs.pop('polygon')
+    if 'iore' in kwargs.keys():
+        if kwargs['iore'].lower() == 'polygoninclude':
+            argStruct['defaultPoly'] = '+'
+        elif kwargs['iore'].lower() == 'polygonexclude':
+            argStruct['defaultPoly'] = '-'
+        kwargs.pop('iore')
+    if 'showplot' in kwargs.keys():
+        argStruct['showPlot'] = kwargs['showplot']
+        kwargs.pop('showplot')
+    if 'overridelndsea' in kwargs.keys():
+        argStruct['overrideLndSea'] = kwargs['overridelndsea']
+        kwargs.pop('overridelndsea')
+    if 'overridecourse' in kwargs.keys():
+        argStruct['overridecourse'] = kwargs['overridecourse']
+        kwargs.pop('overridecourse')
+    if 'specialrunmode' in kwargs.keys():
+        argStruct['specialrunmode'] = kwargs['specialrunmode']
+        kwargs.pop('specialrunmode')
+    if 'rangegridfactor' in kwargs.keys():
+        argStruct['rangegridfactor'] = kwargs['rangegridfactor']
+        kwargs.pop('rangegridfactor')
+    if 'anglegridfactor' in kwargs.keys():
+        argStruct['phiResolutionFactor'] = kwargs['anglegridfactor'] 
+        kwargs.pop('anglegridfactor')
+    if 'gridfactor' in kwargs.keys():
+        argStruct['phiResolutionFactor'] = kwargs['gridfactor'] 
+        argStruct['delResolutionFactor'] = kwargs['gridfactor'] 
+    if len(kwargs) > 0:
+        raise ValueError("Unknown keyword arguments ", list(kwargs.keys()))
+    print(argStruct)
 
-    if Nargs == 1 and isinstance(args[0], dict):
-        # Make sure the structure is of the right type
-        fnAS = argStruct.keys()
-        fnVA = args[0].keys()
-        if len(fnAS) != len(fnVA) or len(fnAS) != sum(key in fnAS for key in fnVA):
-            raise ValueError('The attempted override for the argument structure is wrong. The structure is not of the right type.')
-    
-        argStruct = args[0]
-        if len(args) > 1:
-            print("Attempts to modify an argument structure with key/value and flags are not allowed. All modifications are ignored.")
-    else:
-        iArg = 0
-        while iArg < Nargs:
-            if not isinstance(args[iArg], str):
-                key = args[iArg]
-                raise ValueError(f'Invalid key: {key}. Keys must be strings.')
-    
-            if args[iArg].lower() == 'polygon':
-                argStruct['polygon'] = args[iArg + 1]
-                iArg += 2
-            elif args[iArg].lower() == 'polygoninclude':
-                argStruct['polygon'] = args[iArg + 1]
-                argStruct['defaultPoly'] = '+'
-                iArg += 2
-            elif args[iArg].lower() == 'polygonexclude':
-                argStruct['polygon'] = args[iArg + 1]
-                argStruct['defaultPoly'] = '-'
-                iArg += 2
-            elif args[iArg].lower() == 'showplot':
-                argStruct['showPlot'] = 1
-                iArg += 1
-            elif args[iArg].lower() == 'overridelndsea':
-                argStruct['overrideLndSea'] = 1
-                iArg += 1
-            elif args[iArg].lower() == 'overridecourse':
-                argStruct['overrideCourse'] = 1
-                iArg += 1
-            elif args[iArg].lower() == 'pointsource':
-                # Error checking needed
-                argStruct['specialRunMode'] = 'pointSource'
-                argStruct['specialRunParameters'] = args[iArg + 1]
-                iArg += 2
-            elif args[iArg].lower() == 'seekpolygon':
-                argStruct['specialRunMode'] = 'seekPolygon'
-                iArg += 1
-            elif args[iArg].lower() == 'rangegridfactor':
-                argStruct['delResolutionFactor'] = args[iArg + 1]
-                iArg += 2
-            elif args[iArg].lower() == 'anglegridfactor':
-                argStruct['phiResolutionFactor'] = args[iArg + 1]
-                iArg += 2
-            elif args[iArg].lower() == 'gridfactor':
-                argStruct['delResolutionFactor'] = args[iArg + 1]
-                argStruct['phiResolutionFactor'] = args[iArg + 1]
-                iArg += 2
-            else:
-                raise ValueError(f'Unknown Key: {args[iArg]}')
-    
-    # Read the polygon file
-    argStruct['polygon'] = read_polygon_file(argStruct['polygon'])
     if argStruct['defaultPoly']:
         argStruct['polygon']['default'] = argStruct['defaultPoly']
-    
+   
     # Input consistency checks
     if argStruct['specialRunMode'] == 'seekPolygon' and argStruct['polygon']['default'].lower() != '+':
         raise ValueError('nloadf attempted to seek points within a polygon, but either no polygon was given, or the default was to exclude.')
@@ -573,6 +564,9 @@ def nloadf(station, tideFile, greenFile, modo, *args, **kwargs):
     }
 
     return output
+    '''
+    return
+
 
 def integrated_greens_function(dell, stp, g, index=None):
     
@@ -1089,7 +1083,7 @@ def read_greens_function_file(file):
         expected_keys = [
         'filename', 'description', 'ngreen', 'num', 'ntot', 'ngr', 'rin', 'rout', 'spc', 'fingrd', 'data'
         ]
-        if set(green.keys()) == set(expected_keys):
+        if set(green[0].keys()) == set(expected_keys):
             return [green]
         else:
             raise ValueError('Invalid Green function structure. Wrong fields.')
@@ -1100,9 +1094,8 @@ def read_greens_function_file(file):
     try:
         fptr = open(file, "r+")
         green = {}
-        green['filename'] = file
-        green['description'] = fptr.readline()
-        ii = 0
+        ii = -1
+        description = fptr.readline()
         while True: 
             line = fptr.readline()
             if not line:  # This is effectively feof is true
@@ -1112,6 +1105,8 @@ def read_greens_function_file(file):
                 break
             ii += 1
             green[ii] = {}
+            green[ii]['filename'] = file
+            green[ii]['description'] = description
             green[ii]['ngreen'] = int(params[0])
             green[ii]['num'] = int(params[1])
             green[ii]['ntot'] = int(params[2])
@@ -1152,7 +1147,7 @@ def read_greens_function_file(file):
                 raise ValueError('Consistency check failure. rout - rin != spc * (ngr - 1).')
     
     # All the sections are there
-    if len(green)-2!=green[1]['ntot']:
+    if len(green)!=green[1]['ntot']:
         raise ValueError("The Green's function file {file} doesn't have the expected number of sections.")
 
     return green
