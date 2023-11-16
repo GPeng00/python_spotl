@@ -28,23 +28,36 @@ station = spotl.make_station('station', lat, lon, 0)
 darwinSymbols = ['k1'] #, 'k2', 'm2', 'n2', 'o1', 'p1', 'q1', 's2']
 
 # Implement readPolygonFile
-polywc = spotl.read_polygon_file('../polys/'+mypoly)
+# polywc = spotl.read_polygon_file('../polys/'+mypoly)
+polywc='../polys/'+mypoly
 
 # Implement readGreensFunctionFile
 gr = '../green/green.bou.'+str(dep)  # Adjust file path
 gr = '../green/green.gbaver.wef.p01.ce'
 file=gr
+
 green=spotl.read_greens_function_file(file)
 
 #tideModelWorld = spotl.readTideModelFile(f'../tidmod/m2.osu.tpxo72.2010.txt')
 tide_file='../tidmod/m2.osu.tpxo72.2010.txt'
+
+# def check_kwarg(**kwargs):
+#     if 'first' in kwargs.keys():
+#         print('First is present')
+#     else:
+#         print('First is not present')
+#     return
+
+# check_kwarg(second='Yours')
+
+print("You ran get_tides")
 
 for iDarwin in range(len(darwinSymbols) - 1, -1, -1):
     # Implement readTideModelFile
     tideModelWorld = spotl.read_tide_model_file(f'../tidmod/{darwinSymbols[iDarwin]}.osu.tpxo72.2010.txt')
     tideModel = spotl.read_tide_model_file(f'../tidmod/{darwinSymbols[iDarwin]}.osu.hawaii.2010.txt')
 
-    loadTides[iDarwin * 2] = spotl.nloadf(station, tideModelWorld, green, 'l' , 'polygonExclude', polywc)
+    loadTides[iDarwin * 2] = spotl.nloadf(station, tideModelWorld, green, 'l' , iore='polygonExclude', polygon=polywc)
     # loadTides[iDarwin * 2 - 1] = nloadf(station, tideModel, green, 'l', 'polygonInclude', polywc)
 
 '''
