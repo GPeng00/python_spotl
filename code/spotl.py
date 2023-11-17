@@ -143,6 +143,7 @@ def nloadf(station, tideFile, greenFile, modo, **kwargs):
     >>> output = nloadf(station, tideFile, greenFile, modo)
     
     Written 1/2012 by Charlie Sievers @ UNAVCO.  Modified 11/2023 by Amanda M. Thomas at the University of Oregon.
+    
     """
     
     # Read tide model and Greens function
@@ -192,11 +193,9 @@ def nloadf(station, tideFile, greenFile, modo, **kwargs):
     if 'polygon' in kwargs.keys():
         # If polygon input is string, then read the polygon file
         if isinstance(kwargs['polygon'], str):
-            argStruct['polygon'] = read_polygon_file(argStruct['polygon'])
+            argStruct['polygon'] = read_polygon_file(kwargs['polygon'])
         else:
             argStruct['polygon'] = kwargs['polygon']
-            
-        '''
         kwargs.pop('polygon')
     if 'iore' in kwargs.keys():
         if kwargs['iore'].lower() == 'polygoninclude':
@@ -227,51 +226,55 @@ def nloadf(station, tideFile, greenFile, modo, **kwargs):
         argStruct['delResolutionFactor'] = kwargs['gridfactor'] 
     if len(kwargs) > 0:
         raise ValueError("Unknown keyword arguments ", list(kwargs.keys()))
-    print(argStruct)
 
+
+    # include/exclude in function call supercedes that in the polygon file
     if argStruct['defaultPoly']:
         argStruct['polygon']['default'] = argStruct['defaultPoly']
-   
+        
     # Input consistency checks
     if argStruct['specialRunMode'] == 'seekPolygon' and argStruct['polygon']['default'].lower() != '+':
         raise ValueError('nloadf attempted to seek points within a polygon, but either no polygon was given, or the default was to exclude.')
 
-    # Checks the input structure for point source to make sure it makes sense.
-    if argStruct['specialRunMode'] == 'pointSource':
-        if len(station['Lat']) > 1:
-            # Use recursion for point source for multiple stations.
-            # It would be too confusing otherwise.
-            N = len(station['Lat'])
-            out = {}
-            for ii in range(N):
-                singleStation = make_station(station, ii)
-                out[ii] = nloadf(singleStation, tideFile, greenFile, modo, argStruct)
-            output = out[0]
-            fields = ['gravLoadTide', 'potentialHeight', 'displacement', 'tilt', 'strain']
-            for jj in range(len(fields)):
-                output[fields[jj]] = np.concatenate([out[ii][fields[jj]] for ii in range(N)])
-            output['Station'] = station
-            return  # End Recursions
+    print(argStruct)
+
+    # # TODO: what is specialrunmode
+    # # Checks the input structure for point source to make sure it makes sense.
+    # if argStruct['specialRunMode'] == 'pointSource':
+    #     if len(station['Lat']) > 1:
+    #         # Use recursion for point source for multiple stations.
+    #         # It would be too confusing otherwise.
+    #         N = len(station['Lat'])
+    #         out = {}
+    #         for ii in range(N):
+    #             singleStation = make_station(station, ii)
+    #             out[ii] = nloadf(singleStation, tideFile, greenFile, modo, argStruct)
+    #         output = out[0]
+    #         fields = ['gravLoadTide', 'potentialHeight', 'displacement', 'tilt', 'strain']
+    #         for jj in range(len(fields)):
+    #             output[fields[jj]] = np.concatenate([out[ii][fields[jj]] for ii in range(N)])
+    #         output['Station'] = station
+    #         return  # End Recursions
     
-        sRP = argStruct['specialRunParameters']
-        if not isinstance(sRP, dict) or not sRP or len(set(['Station', 'Area']) & set(sRP.keys())) != 2:
-            print(sRP)
-            # Replace 'keyboard' with an appropriate action
-            raise ValueError('The Point Source structure appears to be of the wrong form.')
+    #     sRP = argStruct['specialRunParameters']
+    #     if not isinstance(sRP, dict) or not sRP or len(set(['Station', 'Area']) & set(sRP.keys())) != 2:
+    #         print(sRP)
+    #         # Replace 'keyboard' with an appropriate action
+    #         raise ValueError('The Point Source structure appears to be of the wrong form.')
     
-        try:
-            sensorTrial = np.concatenate([sRP['Station']])
-            areaTrial = np.concatenate([sRP['Area']])
-            latTrial = np.concatenate([sensorTrial['Lat']])
-            longTrial = np.concatenate([sensorTrial['Long']])
-            if len(areaTrial) != len(latTrial) or len(areaTrial) != len(longTrial):
-                raise ValueError('Numel Error')
-        except Exception as E:
-            print(E)
-            raise ValueError('Errors trying to evaluate the point source structure.')
+    #     try:
+    #         sensorTrial = np.concatenate([sRP['Station']])
+    #         areaTrial = np.concatenate([sRP['Area']])
+    #         latTrial = np.concatenate([sensorTrial['Lat']])
+    #         longTrial = np.concatenate([sensorTrial['Long']])
+    #         if len(areaTrial) != len(latTrial) or len(areaTrial) != len(longTrial):
+    #             raise ValueError('Numel Error')
+    #     except Exception as E:
+    #         print(E)
+    #         raise ValueError('Errors trying to evaluate the point source structure.')
     
-        if 'Overrides' in sRP:
-            argStruct['specialRunOverride'] = 1
+    #     if 'Overrides' in sRP:
+    #         argStruct['specialRunOverride'] = 1
 
     # Ok, the program uses recursion to loop all the tide models 
     # (IE K1, O2, etc.) 
@@ -282,6 +285,7 @@ def nloadf(station, tideFile, greenFile, modo, **kwargs):
         output = combineTideStruct(outputSub)
         return  # End Tidal Model Recursion
     
+    '''
     # Parse the green function data
     nGreen = sum([g['ngr'] for g in green])
     greenDel = np.zeros(nGreen)
@@ -710,14 +714,14 @@ def make_station(*args):
                 Lat = np.concatenate(station['Lat'])
                 Long = np.concatenate(station['Long'])
                 Height = np.concatenate(station['Height'])
-                station = makeStation(Name, Lat, Long, Height)
+                station = make_station(Name, Lat, Long, Height)
                 return station
         else:
             print(station)
             raise ValueError('The only input into makeStation was a structure, but it was not a station structure')
     
     if len(args) == 2 and isinstance(args[0], dict) and isinstance(args[1], int) and len(args[0]) == 1:
-        station = makeStation(args[0])
+        station = make_station(args[0])
         index = args[1]
         if isinstance(station['Name'], list) and len(station['Name']) == len(station['Lat']):
             station['Name'] = [station['Name'][index]]
@@ -728,7 +732,7 @@ def make_station(*args):
     
     if len(args) == 2 and isinstance(args[0], dict) and len(args[0]) > 1:
         stn = args[0]
-        makeStation(stn)  # Error Check
+        make_station(stn)  # Error Check
         arg = args[1]
         
         if isinstance(arg, int):
