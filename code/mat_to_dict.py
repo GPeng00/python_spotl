@@ -13,7 +13,7 @@ import numpy as np
 test = loadmat('test.mat')
 
 loadTide={}
-for ii in range(16):
+for ii in range(2):
     loadTide[ii] = {
         'Station': {'Name': test['loadTides'][0][ii][0][0][0][0][0],
                     'Lat': test['loadTides'][0][ii][0][0][0][1][0][0],
@@ -30,8 +30,9 @@ for ii in range(16):
         'tilt': test['loadTides']['tilt'][0][ii][0],
         'strain': test['loadTides']['strain'][0][ii][0],
     }
+    
 earthTide={}
-for ii in range(16):
+for ii in range(2):
     earthTide[ii] = {
         'Station': {'Name': test['loadTides'][0][ii][0][0][0][0][0],
                     'Lat': test['loadTides'][0][ii][0][0][0][1][0][0],
@@ -246,7 +247,8 @@ def merge_dicts(d1, d2):
     if isinstance(d2,dict):
         return d2
 
-def combine_tide_struct_sub(tidestruct,obligatory_fields):
+def combine_tide_struct_s(tidestruct,obligatory_fields):
+    
     """
     Combines entries within tidestruct based on identical obligatory fields.
     
@@ -256,7 +258,9 @@ def combine_tide_struct_sub(tidestruct,obligatory_fields):
     
     Returns:
     dict: A dictionary containing combined tide structures based on identical obligatory fields.
+    
     """
+    
     result=np.zeros((len(tidestruct),len(tidestruct)))
     for ii in range(len(tidestruct)):
         for jj in range(ii+1,len(tidestruct)):
@@ -270,9 +274,9 @@ def combine_tide_struct_sub(tidestruct,obligatory_fields):
     combos=merge_lists(ind_pairs)
     combinedStruct={}
     for kk in range(len(combos)):
+        combinedStruct[kk]={}
         # have you already been combined
         for field in obligatory_fields:
-            print(field)
             combinedStruct[kk][field] = tidestruct[combos[kk][0]][field]
         # if info field exists, add it
         if 'Info' in tidestruct[combos[kk][0]].keys():
@@ -289,6 +293,58 @@ def combine_tide_struct_sub(tidestruct,obligatory_fields):
                     combinedStruct[kk][field]+=tidestruct[inds][field]
     return combinedStruct
     
+def combine_tide_struct_c(load_tide, earth_tide, combined_tide, obligatory_fields):
+    
+    """
+    Combines entries within tidestruct based on identical obligatory fields.  
+    Assumes they have already been distilled once.
+    
+    Args:
+    tidestruct (list): A list of dictionaries containing tide structure information.
+    obligatory_fields (set): A set of obligatory field names that must be identical for merging.
+    
+    Returns:
+    dict: A dictionary containing combined tide structures based on identical obligatory fields.
+    
+    """
+    # if only load tide and earth tide structures are nonzero length, combine them.
+    if len(load_tide) and len(load_tide)==len(earth_tide) and not len(combined_tide):
+        result=np.zeros((len(load_tide),len(earth_tide)))
+        for ii in range(len(load_tide)):
+            for jj in range(len(earth_tide)):
+                # compares fields and returns 1 where the obligatory fields are identical
+                result[ii,jj]=compare_fields(load_tide[ii],earth_tide[jj],obligatory_fields)
+        # condense entries that have identical obligatory fields
+        ii,jj=np.where(result==1)
+        # makes list of index pairs of entries with the same obligatory fields
+        ind_pairs = [[ii[kk],jj[kk]] for kk in range(len(ii))]
+        # combines all indexes that have similar structure
+        combos=merge_lists(ind_pairs)
+        
+        combinedStruct={}
+        for kk in range(len(combos)):
+            if len(combos[kk])==2:
+                combinedStruct[kk]={}
+                for field in obligatory_fields:
+                    combinedStruct[kk][field] = load_tide[combos[kk][0]][field]
+                combinedStruct[kk]['Type'] = 'CombinedTide'
+                print(obligatory_fields)
+                # if info field exists, add it
+                if 'Info' in load_tide[combos[kk][0]].keys():
+                    load_tide[kk]['Info']=load_tide[combos[kk][0]]['Info']
+                # other fields common to the two dicts
+                other_fields=list(set(load_tide[ii[kk]]).intersection(load_tide[jj[kk]])-set(obligatory_fields)-set({'Info'})-set({'Type'}))
+                for field in other_fields:
+                    init=True
+                    for inds in combos[kk]: 
+                        if init:
+                            combinedStruct[kk][field]=load_tide[inds][field] 
+                            init=False
+                        else:
+                            combinedStruct[kk][field]+=load_tide[inds][field]
+            # TODO: add exception about not being able to make combined tide due to missing/excess tidestruct
+        return combinedStruct
+
 def combine_tide_struct(*args,flag='s'):
     
     """
@@ -390,26 +446,29 @@ def combine_tide_struct(*args,flag='s'):
         for ii,idx in enumerate(ind_load):
             load_tide_dict[ii]=input_struct[idx] 
         len(load_tide_dict)
-        load_tide = combine_tide_struct_sub(load_tide_dict, obligatory_fields)
+        load_tide = combine_tide_struct_s(load_tide_dict, obligatory_fields)
     # for the earth tides
     if n_ind[1] > 0:
         earth_tide_dict = {}
         for ii,idx in enumerate(ind_earth):
             earth_tide_dict[ii]=input_struct[idx]             
-        earth_tide = combine_tide_struct_sub(earth_tide_dict, obligatory_fields)
+        earth_tide = combine_tide_struct_s(earth_tide_dict, obligatory_fields)
     # for the combined tides
     if n_ind[2] > 0:
         combined_tide_dict = {}
         for ii,idx in enumerate(ind_combined):
             combined_tide_dict[ii]=input_struct[idx] 
-        combined_tide = combine_tide_struct_sub(combined_tide_dict, obligatory_fields)
-            
+        combined_tide = combine_tide_struct_s(combined_tide_dict, obligatory_fields)
     # if you want to keep the types separate
     if flag == 's':
         # merged dictionaries with different types
-        output=merge_dict(load_tide,merge_dict(earth_tide,combined_tide))
-    # else:  # (flag == 'c') # if you want to combine them
+        output=merge_dicts(load_tide,merge_dicts(earth_tide,combined_tide))
+    elif flag == 'c': # if you want to combine them
+        obligatory_fields = {'Station', 'Phase', 'Darwin', 'DoodsonNum'}
+        print(load_tide)
+        print(earth_tide)
+        output=combine_tide_struct_c(load_tide, earth_tide, combined_tide, obligatory_fields)
 
     return output    
 
-out=combine_tide_struct(loadTide)
+out=combine_tide_struct(loadTide,earthTide,flag='c')
